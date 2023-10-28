@@ -23,6 +23,18 @@ pub struct TaskInfo {
     time: usize,
 }
 
+/// Implement for taskinfo
+impl TaskInfo {
+    /// Implement for taskinfo new
+    pub fn new(status: TaskStatus, syscall_times: [u32; MAX_SYSCALL_NUM], time: usize) -> Self {
+        Self {
+            status,
+            syscall_times,
+            time,
+        }
+    }
+}
+
 /// task exits and submit an exit code
 pub fn sys_exit(exit_code: i32) -> ! {
     trace!("[kernel] Application exited with code {}", exit_code);
@@ -50,8 +62,9 @@ pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
     0
 }
 
+use crate::task::get_current_task_info;
 /// YOUR JOB: Finish sys_task_info to pass testcases
-pub fn sys_task_info(_ti: *mut TaskInfo) -> isize {
+pub fn sys_task_info(ti: *mut TaskInfo) -> isize {
     trace!("kernel: sys_task_info");
-    -1
+    get_current_task_info(ti)
 }

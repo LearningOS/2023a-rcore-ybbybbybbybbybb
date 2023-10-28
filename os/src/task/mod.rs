@@ -14,12 +14,14 @@ mod switch;
 #[allow(clippy::module_inception)]
 mod task;
 
-use crate::config::MAX_APP_NUM;
+use crate::config::{MAX_APP_NUM, MAX_SYSCALL_NUM};
 use crate::loader::{get_num_app, init_app_cx};
 use crate::sync::UPSafeCell;
+use crate::timer::get_time_ms;
 use lazy_static::*;
 use switch::__switch;
 pub use task::{TaskControlBlock, TaskStatus};
+use crate::syscall::TaskInfo;
 
 pub use context::TaskContext;
 
@@ -54,6 +56,8 @@ lazy_static! {
         let mut tasks = [TaskControlBlock {
             task_cx: TaskContext::zero_init(),
             task_status: TaskStatus::UnInit,
+            task_first_start_time: 0,
+            task_syscall_times: [0; MAX_SYSCALL_NUM],
         }; MAX_APP_NUM];
         for (i, task) in tasks.iter_mut().enumerate() {
             task.task_cx = TaskContext::goto_restore(init_app_cx(i));
@@ -79,6 +83,9 @@ impl TaskManager {
     fn run_first_task(&self) -> ! {
         let mut inner = self.inner.exclusive_access();
         let task0 = &mut inner.tasks[0];
+        if task0.task_status == TaskStatus::UnInit {
+            task0.task_first_start_time = get_time_ms();
+        }
         task0.task_status = TaskStatus::Running;
         let next_task_cx_ptr = &task0.task_cx as *const TaskContext;
         drop(inner);
@@ -135,6 +142,30 @@ impl TaskManager {
             panic!("All applications completed!");
         }
     }
+
+    /// Add current task syscall times
+    fn add_current_task_syscall_times(&self, syscall_id: usize) {
+        let mut inner = self.inner.exclusive_access();
+        let current_task_id = inner.current_task;
+        inner.tasks[current_task_id].task_syscall_times[syscall_id] += 1;
+    }
+
+    /// Get current task info
+    fn get_current_task_info(&self, ti: *mut TaskInfo) -> isize {
+        if ti.is_null() {
+            return -1;
+        }
+        let inner = self.inner.exclusive_access();
+        let task_info = TaskInfo::new(
+            TaskStatus::Running,
+            inner.tasks[inner.current_task].task_syscall_times,
+            get_time_ms() - inner.tasks[inner.current_task].task_first_start_time,
+        );
+        unsafe {
+            *ti = task_info;
+        }
+        0
+    }
 }
 
 /// Run the first task in task list.
@@ -168,4 +199,14 @@ pub fn suspend_current_and_run_next() {
 pub fn exit_current_and_run_next() {
     mark_current_exited();
     run_next_task();
+}
+
+/// Add current task syscall times
+pub fn add_current_task_syscall_times(syscall_id: usize) {
+    TASK_MANAGER.add_current_task_syscall_times(syscall_id);
+}
+
+/// Get current task info
+pub fn get_current_task_info(ti: *mut TaskInfo) -> isize {
+    TASK_MANAGER.get_current_task_info(ti)
 }
