@@ -8,13 +8,21 @@ use bitflags::*;
 bitflags! {
     /// page table entry flags
     pub struct PTEFlags: u8 {
+        /// ?
         const V = 1 << 0;
+        /// ?
         const R = 1 << 1;
+        /// ?
         const W = 1 << 2;
+        /// ?
         const X = 1 << 3;
+        /// ?
         const U = 1 << 4;
+        /// ?
         const G = 1 << 5;
+        /// ?
         const A = 1 << 6;
+        /// ?
         const D = 1 << 7;
     }
 }
@@ -156,7 +164,7 @@ pub fn translated_byte_buffer(token: usize, ptr: *const u8, len: usize) -> Vec<&
     let end = start + len;
     let mut v = Vec::new();
     while start < end {
-        let start_va = VirtAddr::from(start);
+        let start_va: VirtAddr = VirtAddr::from(start);
         let mut vpn = start_va.floor();
         let ppn = page_table.translate(vpn).unwrap().ppn();
         vpn.step();
@@ -170,4 +178,15 @@ pub fn translated_byte_buffer(token: usize, ptr: *const u8, len: usize) -> Vec<&
         start = end_va.into();
     }
     v
+}
+
+/// modify usize address
+pub fn modify_usize_address(token: usize, ptr: usize, data: usize) {
+    let page_table = PageTable::from_token(token);
+    let start_va = VirtAddr::from(ptr);
+    // let end_va = VirtAddr::from(ptr + len);
+    let vpn = start_va.floor();
+    let ppn: PhysPageNum = page_table.translate(vpn).unwrap().ppn();
+    let tmp: &'static mut [usize; crate::config::PAGE_SIZE/core::mem::size_of::<usize>()] = ppn.get_mut();
+    tmp[start_va.page_offset()/core::mem::size_of::<usize>()] = data;
 }

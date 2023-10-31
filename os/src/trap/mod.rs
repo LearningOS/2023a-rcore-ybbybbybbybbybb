@@ -72,6 +72,10 @@ pub fn trap_handler() -> ! {
         | Trap::Exception(Exception::StorePageFault)
         | Trap::Exception(Exception::LoadFault)
         | Trap::Exception(Exception::LoadPageFault) => {
+            // if scause.cause() == Trap::Exception(Exception::StoreFault){ println!("[kernel] 1"); }
+            // if scause.cause() == Trap::Exception(Exception::StorePageFault){ println!("[kernel] 2"); }
+            // if scause.cause() == Trap::Exception(Exception::LoadFault){ println!("[kernel] 3"); }
+            // if scause.cause() == Trap::Exception(Exception::LoadPageFault){ println!("[kernel] 4"); }
             println!("[kernel] PageFault in application, bad addr = {:#x}, bad instruction = {:#x}, kernel killed it.", stval, cx.sepc);
             exit_current_and_run_next();
         }

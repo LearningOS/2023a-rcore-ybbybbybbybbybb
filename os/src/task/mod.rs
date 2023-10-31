@@ -16,7 +16,10 @@ mod task;
 
 use crate::loader::{get_app_data, get_num_app};
 use crate::sync::UPSafeCell;
+use crate::syscall::TaskInfo;
+use crate::timer::get_time_ms;
 use crate::trap::TrapContext;
+use crate::mm::*;
 use alloc::vec::Vec;
 use lazy_static::*;
 use switch::__switch;
@@ -78,6 +81,9 @@ impl TaskManager {
     fn run_first_task(&self) -> ! {
         let mut inner = self.inner.exclusive_access();
         let next_task = &mut inner.tasks[0];
+        // if next_task.task_status == TaskStatus::UnInit {
+        next_task.task_first_start_time = get_time_ms();
+        // }
         next_task.task_status = TaskStatus::Running;
         let next_task_cx_ptr = &next_task.task_cx as *const TaskContext;
         drop(inner);
@@ -139,6 +145,9 @@ impl TaskManager {
         if let Some(next) = self.find_next_task() {
             let mut inner = self.inner.exclusive_access();
             let current = inner.current_task;
+            if inner.tasks[next].task_first_start_time == 0 {
+                inner.tasks[next].task_first_start_time = get_time_ms();
+            }
             inner.tasks[next].task_status = TaskStatus::Running;
             inner.current_task = next;
             let current_task_cx_ptr = &mut inner.tasks[current].task_cx as *mut TaskContext;
@@ -152,6 +161,83 @@ impl TaskManager {
         } else {
             panic!("All applications completed!");
         }
+    }
+
+    /// Add current syscall times
+    fn add_current_syscall_times(&self, syscall_id: usize) {
+        let mut inner = self.inner.exclusive_access();
+        let current_task = inner.current_task;
+        inner.tasks[current_task].task_syscall_times[syscall_id] += 1;
+    }
+
+    /// Get current task info
+    fn get_current_task_info(&self, ti: *mut TaskInfo) -> isize {
+        if ti.is_null() {
+            return -1;
+        }
+        let inner = self.inner.exclusive_access();
+        let current_task = inner.current_task;
+        let task_info_len = core::mem::size_of::<TaskInfo>();
+        let task_info = TaskInfo::new(
+            TaskStatus::Running,
+            inner.tasks[current_task].task_syscall_times,
+            get_time_ms() - inner.tasks[current_task].task_first_start_time,
+        );
+        // println!("ltime :{}, rtime: {}", get_time_ms(),inner.tasks[current_task].task_first_start_time);
+        // ?
+        drop(inner);
+        let task_info_ptr = &task_info as *const _ as *const u8;
+        let task_info_slice = unsafe { core::slice::from_raw_parts(task_info_ptr, task_info_len) };
+        let mut buffers = translated_byte_buffer(current_user_token(), ti as *const u8, task_info_len);
+        buffers[0][..task_info_len].copy_from_slice(task_info_slice);
+        0
+    }
+
+    /// Current task mmap
+    fn current_task_mmap(&self, start_va: VirtAddr, end_va: VirtAddr, permission: MapPermission) -> isize {
+        let mut inner = self.inner.exclusive_access();
+        let current_task = inner.current_task;
+        let start_vpn = start_va.floor();
+        let end_vpn = end_va.ceil();
+        let mut vpn = start_vpn;
+        println!("statr:{}, end:{}", start_vpn.0, end_vpn.0);
+        while vpn < end_vpn {
+            println!("now:{}", vpn.0);
+            if let Some(pte) = inner.tasks[current_task].memory_set.translate(vpn) {
+                if pte.is_valid() {
+                    return -1;
+                }
+            }
+            vpn.step();
+        }
+        inner.tasks[current_task].memory_set.insert_framed_area(start_va, end_va, permission);
+        0
+    }
+
+    /// Current task munmap
+    fn current_task_munmap(&self, start_va: VirtAddr, end_va: VirtAddr) -> isize {
+        let mut inner = self.inner.exclusive_access();
+        let current_task = inner.current_task;
+        let start_vpn = start_va.floor();
+        let end_vpn = end_va.ceil();
+        let mut vpn = start_vpn;
+        println!("2 statr:{}, end:{}", start_vpn.0, end_vpn.0);
+        while vpn < end_vpn {
+            println!("2 now:{}", vpn.0);
+            match inner.tasks[current_task].memory_set.translate(vpn) {
+                Some(pte) => {
+                    if !pte.is_valid() {
+                        return -1;
+                    }
+                }, 
+                None => {
+                    return -1;
+                },
+            }
+            vpn.step();
+        }
+        inner.tasks[current_task].memory_set.shrink_to(start_va, start_va);
+        0
     }
 }
 
@@ -201,4 +287,24 @@ pub fn current_trap_cx() -> &'static mut TrapContext {
 /// Change the current 'Running' task's program break
 pub fn change_program_brk(size: i32) -> Option<usize> {
     TASK_MANAGER.change_current_program_brk(size)
+}
+
+/// Add syscall times
+pub fn add_current_syscall_times(syscall_id: usize) {
+    TASK_MANAGER.add_current_syscall_times(syscall_id);
+}
+
+/// Get current task info
+pub fn get_current_task_info(ti: *mut TaskInfo) -> isize {
+    TASK_MANAGER.get_current_task_info(ti)
+}
+
+/// Current task mmap
+pub fn current_task_mmap(start_va: VirtAddr, end_va: VirtAddr, permission: MapPermission) -> isize {
+    TASK_MANAGER.current_task_mmap(start_va, end_va, permission)
+}
+
+/// Current task munmap
+pub fn current_task_munmap(start_va: VirtAddr, end_va: VirtAddr) -> isize {
+    TASK_MANAGER.current_task_munmap(start_va, end_va)
 }
