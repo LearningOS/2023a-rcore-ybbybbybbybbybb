@@ -5,6 +5,7 @@ use crate::config::MAX_SYSCALL_NUM;
 use super::TaskContext;
 
 /// The task control block (TCB) of a task.
+/// 与范天奇，叶可禾交流 TCB 设定
 #[derive(Copy, Clone)]
 pub struct TaskControlBlock {
     /// The task status in it's lifecycle
