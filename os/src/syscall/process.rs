@@ -7,7 +7,7 @@ use crate::{
     mm::{translated_refmut, translated_str},
     task::{
         add_task, current_task, current_user_token, exit_current_and_run_next,
-        suspend_current_and_run_next, TaskStatus,
+        suspend_current_and_run_next, TaskStatus, TaskControlBlock,
     },
 };
 
@@ -166,12 +166,35 @@ pub fn sys_sbrk(size: i32) -> isize {
 
 /// YOUR JOB: Implement spawn.
 /// HINT: fork + exec =/= spawn
-pub fn sys_spawn(_path: *const u8) -> isize {
-    trace!(
-        "kernel:pid[{}] sys_spawn NOT IMPLEMENTED",
-        current_task().unwrap().pid.0
-    );
-    -1
+pub fn sys_spawn(path: *const u8) -> isize {
+    // trace!(
+    //     "kernel:pid[{}] sys_spawn NOT IMPLEMENTED",
+    //     current_task().unwrap().pid.0
+    // );
+    let token = current_user_token();
+    let path = translated_str(token, path);
+    let elf_data;
+    if let Some(data) = get_app_data_by_name(path.as_str()) {
+        elf_data = data;
+    } else {
+        return -1;
+    }
+    let new_task = Arc::new(TaskControlBlock::new(elf_data));
+    let new_pid = new_task.pid.0;
+
+    let current_task = current_task().unwrap();
+    let mut parent_inner = current_task.inner_exclusive_access();
+    parent_inner.children.push(new_task.clone());
+
+    let mut new_task_inner = new_task.clone().inner_exclusive_access();
+    new_task_inner.parent = Some(Arc::downgrade(&current_task));
+    add_task(new_task);
+    // drop(new_task_inner);
+    // drop(new_task);
+    // drop(current_task);
+    // drop(parent_inner);
+
+    new_pid as isize
 }
 
 // YOUR JOB: Set task priority.

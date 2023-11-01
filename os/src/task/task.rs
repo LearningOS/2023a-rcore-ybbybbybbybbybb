@@ -133,6 +133,22 @@ impl TaskControlBlock {
         task_control_block
     }
 
+    // /// spwan
+    // pub fn spwan(&self, elf_data: &[u8]) -> isize {
+    //     let current_task = current_task().unwrap();
+    //     let new_task = current_task.fork();
+    //     let new_pid = new_task.pid.0;
+    //     // modify trap context of new_task, because it returns immediately after switching
+    //     let trap_cx = new_task.inner_exclusive_access().get_trap_cx();
+    //     // we do not have to move to next instruction since we have done it before
+    //     // for child process, fork returns 0
+    //     trap_cx.x[10] = 0;
+    //     // add new task to scheduler
+    //     add_task(new_task);
+    //     new_pid as isize
+    //     -1
+    // }
+
     /// Load a new elf to replace the original application address space and start execution
     pub fn exec(&self, elf_data: &[u8]) {
         // memory_set with elf program headers/trampoline/trap context/user stack
