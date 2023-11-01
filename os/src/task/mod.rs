@@ -215,6 +215,7 @@ impl TaskManager {
     }
 
     /// Current task munmap
+    /// 与范天奇，叶可禾交流题目意，确定函数实现目标
     fn current_task_munmap(&self, start_va: VirtAddr, end_va: VirtAddr) -> isize {
         let mut inner = self.inner.exclusive_access();
         let current_task = inner.current_task;

@@ -80,6 +80,7 @@ pub fn sys_task_info(ti: *mut TaskInfo) -> isize {
 pub fn sys_mmap(start: usize, len: usize, port: usize) -> isize {
     let start_va = VirtAddr::from(start);
     let end_va = VirtAddr::from(start + len);
+    /// 与 范天奇，叶可禾交流port转MapPermission
     let permission = MapPermission::from_bits_truncate((port << 1) as u8) | MapPermission::U;
     if !start_va.aligned() {
         return -1;
