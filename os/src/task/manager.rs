@@ -23,7 +23,31 @@ impl TaskManager {
     }
     /// Take a process out of the ready queue
     pub fn fetch(&mut self) -> Option<Arc<TaskControlBlock>> {
-        self.ready_queue.pop_front()
+        // self.ready_queue.pop_front()
+        let mut len = self.ready_queue.len();
+        if len == 0 {
+            return None;
+        }
+        let mut tmp = self.ready_queue.pop_front().unwrap();
+        while len > 1 {
+            let mut now = self.ready_queue.pop_front().unwrap();
+            if tmp.inner_exclusive_access().stride > now.inner_exclusive_access().stride {
+                unsafe {
+                    core::ptr::swap(&mut tmp as *mut _, &mut now as *mut _);
+                }
+            }
+            self.ready_queue.push_back(now);
+            len -= 1;
+        }
+        Some(tmp)
+        // self.ready_queue
+        //     .iter()
+        //     .min_by(|&x, &y| {
+        //         let x_inner = x.inner_exclusive_access();
+        //         let y_inner = y.inner_exclusive_access();
+        //         x_inner.stride.cmp(&y_inner.stride)
+        //     })
+        //     .cloned()
     }
 }
 

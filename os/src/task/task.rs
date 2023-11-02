@@ -1,7 +1,7 @@
 //! Types related to task management & Functions for completely changing TCB
 use super::TaskContext;
 use super::{kstack_alloc, pid_alloc, KernelStack, PidHandle};
-use crate::config::TRAP_CONTEXT_BASE;
+use crate::config::{TRAP_CONTEXT_BASE, MAX_SYSCALL_NUM, BIG_STRIDE, INITIAL_PRIORITY};
 use crate::mm::{MemorySet, PhysPageNum, VirtAddr, KERNEL_SPACE};
 use crate::sync::UPSafeCell;
 use crate::trap::{trap_handler, TrapContext};
@@ -68,6 +68,17 @@ pub struct TaskControlBlockInner {
 
     /// Program break
     pub program_brk: usize,
+
+    /// task syscall times
+    pub task_syscall_times: [u32; MAX_SYSCALL_NUM],
+
+    /// task first start time
+    pub task_first_start_time: usize,
+
+    /// stride
+    pub stride: usize,
+    /// priority
+    pub pass: usize,
 }
 
 impl TaskControlBlockInner {
@@ -84,6 +95,11 @@ impl TaskControlBlockInner {
     }
     pub fn is_zombie(&self) -> bool {
         self.get_status() == TaskStatus::Zombie
+    }
+
+    /// add syscall times
+    pub fn add_syscall_times(&mut self, syscall_id: usize) {
+        self.task_syscall_times[syscall_id] += 1;
     }
 }
 
@@ -118,6 +134,10 @@ impl TaskControlBlock {
                     exit_code: 0,
                     heap_bottom: user_sp,
                     program_brk: user_sp,
+                    task_syscall_times: [0; MAX_SYSCALL_NUM],
+                    task_first_start_time: usize::MAX,
+                    stride: 0,
+                    pass: BIG_STRIDE / INITIAL_PRIORITY,
                 })
             },
         };
@@ -207,6 +227,10 @@ impl TaskControlBlock {
                     exit_code: 0,
                     heap_bottom: parent_inner.heap_bottom,
                     program_brk: parent_inner.program_brk,
+                    task_syscall_times: [0; MAX_SYSCALL_NUM],
+                    task_first_start_time: usize::MAX,
+                    stride: 0,
+                    pass: BIG_STRIDE / INITIAL_PRIORITY,
                 })
             },
         });
