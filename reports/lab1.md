@@ -1,52 +1,56 @@
+# 编程作业
+
+- 为了实现 sys_task_info 我在原本 TaskControlBlock 的基础上添加了 task_syscall_times 数组和 first_start_time 字段来记录获取 taskinfo 所需信息，并在一些函数中实现对这两个字段的修改，使得在调用 sys_task_info 时能够准确获得所需的信息。
+
 # 简答作业
 
 # 1.
 
 - **使用的 SBI 及其版本:** RustSBI-QEMU Version 0.2.0-alpha.2
 - **ch2b_bad_address.rs**:
-    - **错误信息:** `[kernel] PageFault in application, bad addr = 0x0, bad instruction = 0x804003c4, kernel killed it.`
-    - **原因:** 用户程序试图访问受保护地址而触发 `kill`。
+    - **错误信息:** [kernel] PageFault in application, bad addr = 0x0, bad instruction = 0x804003c4, kernel killed it.
+    - **原因:** 用户程序试图访问受保护地址而触发 kill。
 - **ch2b_bad_instructions.rs**:
-    - **错误信息:** `IllegalInstruction in application, kernel killed it.`
-    - **原因:** 用户程序试图使用特权指令触发报错被 `kill`。
+    - **错误信息:** IllegalInstruction in application, kernel killed it.
+    - **原因:** 用户程序试图使用特权指令触发报错被 kill。
 - **ch2b_bad_register.rs**:
-    - **错误信息:** `IllegalInstruction in application, kernel killed it.`
-    - **原因:** 用户程序试图使用特权寄存器触发报错被 `kill`。
+    - **错误信息:** IllegalInstruction in application, kernel killed it.
+    - **原因:** 用户程序试图使用特权寄存器触发报错被 kill。
 
 
 # 2.
 1. **L40：刚进入 __restore 时，a0 代表了什么值。请指出 __restore 的两种使用情景。**
-    - 刚进入 `__restore` 时，`a0` 的值为 `trap_handler` 函数中返回的`cx`，也就是原来 `__alltraps` 任务的 `trapcontent` 栈指针。
+    - 刚进入 __restore 时，a0 的值为 trap_handler 函数中返回的cx，也就是原来 __alltraps 任务的 trapcontent 栈指针。
     - 使用情景：
         1. 中断返回：当在处理完一个中断并返回后。
-        2. 任务切换：当内核任务切换完成后，可以调用 `__restore` 来恢复切换到的任务的上下文。
+        2. 任务切换：当内核任务切换完成后，可以调用 __restore 来恢复切换到的任务的上下文。
 
 2. **L43-L48：这几行汇编代码特殊处理了哪些寄存器？这些寄存器的的值对于进入用户态有何意义？请分别解释。**
-    - 特殊处理的寄存器是 CSR 中的 `sstatus`, `sepc`, 和 `sscratch`。
+    - 特殊处理的寄存器是 CSR 中的 sstatus, sepc, 和 sscratch。
     - 意义：
-        - `sstatus`: 保存了进入异常前的处理器状态，恢复它能确保处理器返回到正确的权限级别和状态。
-        - `sepc`: 异常程序计数器，保存了发生异常时的地址。以确保在处理完中断/异常后可以继续执行下一条指令。
-        - `sscratch`: 是一个临时存储，用于在异常处理过程中临时保存和恢复 `sp` 的值。以确保在处理完中断/异常后可以恢复正确的 `sp` 的值。
+        - sstatus: 保存了进入异常前的处理器状态，恢复它能确保处理器返回到正确的权限级别和状态。
+        - sepc: 异常程序计数器，保存了发生异常时的地址。以确保在处理完中断/异常后可以继续执行下一条指令。
+        - sscratch: 是一个临时存储，用于在异常处理过程中临时保存和恢复 sp 的值。以确保在处理完中断/异常后可以恢复正确的 sp 的值。
 
 3. **L50-L56：为何跳过了 x2 和 x4？**
-    - `__alltraps` 没有保存 `x2` 与 `x4`
-    - `x2` 是栈指针 `sp`，已经在其他地方特殊处理。
-    - `x4` 是线程指针 `tp`，在这个上下文中应用程序并不使用它，因此没有必要保存和恢复。
+    - __alltraps 没有保存 x2 与 x4
+    - x2 是栈指针 sp，已经在其他地方特殊处理。
+    - x4 是线程指针 tp，在这个上下文中应用程序并不使用它，因此没有必要保存和恢复。
 
 4. **L60：该指令之后，sp 和 sscratch 中的值分别有什么意义？**
-    - `sp` 将指向用户态的栈的栈顶。
-    - `sscratch` 将指向内核态的栈的栈顶。
+    - sp 将指向用户态的栈的栈顶。
+    - sscratch 将指向内核态的栈的栈顶。
 
-5. **`__restore` 中发生状态切换在哪一条指令？为何该指令执行之后会进入用户态？**
-    - 状态切换发生在 L61 `sret` 指令。
-    - `sret` 指令从 S 态返回到之前的权限级别，由 `sstatus` CSR 中的相关字段决定返回到哪个状态。由于 `sstatus` 被恢复为异常之前的值，所以会返回到用户态。
+5. **__restore 中发生状态切换在哪一条指令？为何该指令执行之后会进入用户态？**
+    - 状态切换发生在 L61 sret 指令。
+    - sret 指令从 S 态返回到之前的权限级别，由 sstatus CSR 中的相关字段决定返回到哪个状态。由于 sstatus 被恢复为异常之前的值，所以会返回到用户态。
 
 6. **L13：该指令之后，sp 和 sscratch 中的值分别有什么意义？**
-    - 这条指令交换了 `sp` 和 `sscratch` 的值。`sp` 将指向内核态的栈顶，而 `sscratch` 将指向用户态的栈的栈顶。
+    - 这条指令交换了 sp 和 sscratch 的值。sp 将指向内核态的栈顶，而 sscratch 将指向用户态的栈的栈顶。
 
 7. **从 U 态进入 S 态是哪一条指令发生的？**
-    - 内核态从 `U` 态进入 `S` 态应该是由 `ecall` 指令发生的
-    - 而内核栈从 `U` 态进入 `S` 态应该是由 `csrrw sp, sscratch, sp` 指令发生的
+    - 内核态从 U 态进入 S 态应该是由 ecall 指令发生的
+    - 而内核栈从 U 态进入 S 态应该是由 csrrw sp, sscratch, sp 指令发生的
 
 # 荣誉准则
 
