@@ -1,12 +1,17 @@
- # 简答作业
+# 编程作业
+
+- spawn :过程类似 fork(exec())，只是新建 TCB 时直接 TaskControlBlock::new(elf_data)，然后修改其中的 parent。
+- stride 调度算法 :在 TaskControlBlockInner 中添加 stride 与 pass 字段，set_prio 时 pass改为 BIG_STRIDE / prio
+
+# 简答作业
 
 # 实际情况是轮到 p1 执行吗？为什么？
 
-- 不是，`p2.stride` 类型为 `u8` 值域为 `0-255` 所以 `p2.stridev + 10` 溢出为 `4`，还是轮到 `p2` 执行
+- 不是，p2.stride 类型为 u8 值域为 0-255 所以 p2.stridev + 10 溢出为 4，还是轮到 p2 执行
 
 # 为什么STRIDE_MAX – STRIDE_MIN <= BigStride / 2？
 
-- 因为优先级大于等于 `2`，所以每次增加的步长都小于等于 `BigStride/2`，而 `stride` 小的优先执行，设stride最小为 `stride1`，第二小为 `stride2`，`stride1 + BigStride/2 - stride2 <= BigStride/2`
+- 因为优先级大于等于 2，所以每次增加的步长都小于等于 BigStride/2，而 stride 小的优先执行，设stride最小为 stride1，第二小为 stride2，stride1 + BigStride/2 - stride2 <= BigStride/2
 
 # 补全下列代码中的 partial_cmp 函数
 
